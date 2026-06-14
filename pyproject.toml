@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verify-identifiers"
+version = "0.1.0"
+description = "Fail-closed existence verification for model-emitted identifiers (anti-slopsquatting)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "cdmx.in", email = "licensing@cdmx.in" }]
+keywords = ["mcp", "llm", "agent", "hallucination", "slopsquatting", "supply-chain", "security"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Security",
+  "Topic :: Software Development :: Quality Assurance",
+  "Programming Language :: Python :: 3",
+]
+dependencies = []  # stdlib only — zero runtime dependencies by design
+
+[project.urls]
+Documentation = "https://github.com/cdmx-in/verify-identifiers/tree/main/docs"
+
+[project.scripts]
+verify-mcp = "server:main"
+
+[tool.setuptools]
+package-dir = { "" = "spike" }
+py-modules = ["verifier", "cache", "server", "hook"]
+
+# Note: modules are currently flat (verifier/cache/server/hook). Namespacing them
+# under a `verify_identifiers` package is a roadmap item before PyPI publish.

@@ -1,0 +1,3 @@
+.verify-cache.sqlite
+__pycache__/
+*.pyc

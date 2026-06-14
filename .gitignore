@@ -1,0 +1,10 @@
+# caches / build artifacts
+**/.verify-cache.sqlite
+**/__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+
+# local agent config (the live dogfooding wiring — not part of the package)
+.claude/settings.local.json
