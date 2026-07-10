@@ -12,6 +12,16 @@ All notable changes to this project are documented here. Format loosely follows
 - **Manifest gate**: `pip install -r requirements.txt` now reads the file and a bare
   `npm install` reads `package.json`, so the common "write a manifest, then install it"
   flow is verified instead of bypassed.
+- **Many more install verbs**: `poetry add`, `pdm add`, `pipenv install`, `uv add`,
+  `bun add`, `pnpm`, and the one-off executors `npx` / `bunx` / `uvx` / `pipx run` /
+  `pnpm dlx` / `yarn dlx` (for executors only the run target is verified, not its args).
+- **Command normalization**: `sudo`, `env`, `VAR=x` prefixes are stripped, and
+  path- / version-suffixed interpreters (`/usr/bin/pip`, `pip3.12`, `python3.11`,
+  `py -3 -m pip`) are recognized.
+- **`vaporcheck doctor`** (`python -m vaporcheck.doctor`): self-test for interpreter
+  (flags the Windows Store `python` stub), cache location, and PyPI/npm reachability.
+- **[docs/LIMITATIONS.md](docs/LIMITATIONS.md)**: enforcement matrix, honest threat-model
+  scope, and a complementary-not-competing comparison to registry-side scanners.
 
 ### Fixed
 - **npm false "exists"**: unpublished and security-holding packages (HTTP 200 with no
@@ -24,10 +34,15 @@ All notable changes to this project are documented here. Format loosely follows
 - **Fewer false denies**: option values (`--target dir`, `-i url`, …) are no longer
   mistaken for package names, and installs against a private index/registry are skipped
   rather than denied against the public registry.
+- **Never fails open**: a corrupt cache is detected and rebuilt (and the cache now lives
+  in a per-user dir, not read-only site-packages); an unexpected error in the hook now
+  degrades to **ask** instead of a silent allow; multi-package installs are verified
+  concurrently within a deadline under the hook timeout (Claude Code fail-opens on
+  timeout); stdin/stdout are forced to UTF-8 so non-ASCII paths aren't mis-decoded.
 
 ### Tests
-- New suites `test_manifest.py` (7) and `test_verdicts.py` (7); `run_spike.py` gains a
-  manifest-deny end-to-end case. 53 checks across 6 suites.
+- New suites `test_verbs.py` (20), `test_manifest.py` (7), `test_verdicts.py` (8);
+  `run_spike.py` gains a manifest-deny end-to-end case. 74 checks across 7 suites.
 
 ## [0.1.0] — 2026-07-10
 

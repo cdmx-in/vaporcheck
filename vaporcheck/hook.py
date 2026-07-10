@@ -18,11 +18,17 @@ import os
 import re
 import shlex
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     from . import verifier  # installed package
 except ImportError:
     import verifier  # run as a plain script from the source tree
+
+# overall budget for verifying one tool call — kept under the hook's own timeout
+# (Claude Code fail-OPENS if the hook times out, so we must finish first).
+DEADLINE_S = 12.0
 
 # strip version pins / extras: requests==2.0, requests>=2, pkg[extra], left@1.2.3
 _VERSION_SPLIT = re.compile(r"[=<>!~\[]|@(?=[\d^~v])")
@@ -41,9 +47,15 @@ _OPT_WITH_VALUE = {
 _PRIVATE_INDEX = {"-i", "--index-url", "--extra-index-url", "--registry"}
 # manifest files whose contents route through the same resolvers
 _REQ_FLAGS = {"-r", "--requirement"}
+# command prefixes to skip before the real command (sudo pip …, VAR=x npm …)
+_PREFIX_CMDS = {"sudo", "env", "nice", "time", "exec"}
+_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# interpreter/tool basenames, version-suffixed (pip3.12, python3.11)
+_PIP_RE = re.compile(r"^pip[0-9.]*$")
+_PY_RE = re.compile(r"^python[0-9.]*$")
 # legacy fallback patterns (used only if shell tokenization fails)
-_PY_INSTALL = re.compile(r"\b(?:pip3?|pipx|uv(?:\s+pip)?|python3?\s+-m\s+pip)\s+install\b", re.I)
-_NPM_INSTALL = re.compile(r"\b(?:npm\s+(?:i|install|add)|yarn\s+add|pnpm\s+add)\b", re.I)
+_PY_INSTALL = re.compile(r"\b(?:pip[0-9.]*|pipx|uv(?:\s+pip)?|python[0-9.]*\s+-m\s+pip)\s+install\b", re.I)
+_NPM_INSTALL = re.compile(r"\b(?:npm\s+(?:i|install|add)|yarn\s+add|pnpm\s+add|bun\s+add)\b", re.I)
 
 
 def _strip_heredocs(cmd: str) -> str:
@@ -76,21 +88,103 @@ def _is_pkg(tok: str):
     return None
 
 
+def _strip_prefixes(seg):
+    """Drop leading sudo/env/nice wrappers and VAR=value assignments."""
+    i, skipped = 0, False
+    while i < len(seg):
+        tok = seg[i]
+        if tok in _PREFIX_CMDS or _ASSIGN.match(tok):
+            skipped = True; i += 1; continue
+        if skipped and tok.startswith("-"):             # flags belonging to sudo/env
+            i += 1; continue
+        break
+    return seg[i:]
+
+
+def _norm(tok):
+    """Basename, lowercased, no .exe — so /usr/bin/pip3.12 and PIP.EXE normalize."""
+    base = tok.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    return base[:-4] if base.endswith(".exe") else base
+
+
 def _classify(seg):
-    """Map a command's leading tokens to (ecosystem, arg_start_index) or None."""
-    t = seg
-    if len(t) >= 4 and t[0] in ("python", "python3") and t[1] == "-m" and t[2] == "pip" and t[3] == "install":
-        return ("pypi", 4)
-    if len(t) >= 3 and t[0] == "uv" and t[1] == "pip" and t[2] == "install":
-        return ("pypi", 3)
-    if len(t) >= 2 and t[0] in ("pip", "pip3", "pipx") and t[1] == "install":
-        return ("pypi", 2)
-    if len(t) >= 2 and t[0] == "uv" and t[1] == "add":
-        return ("pypi", 2)
-    if len(t) >= 2 and t[0] == "npm" and t[1] in ("install", "i", "add"):
-        return ("npm", 2)
-    if len(t) >= 2 and t[0] in ("yarn", "pnpm") and t[1] in ("add", "install"):
-        return ("npm", 2)
+    """Return (ecosystem, args, mode, manifest) or None.
+
+    args     = the token list AFTER the install verb
+    mode     = 'all'   -> every arg may be a package (installers)
+               'first' -> only the first package (one-off executors: npx/uvx/…)
+    manifest = 'package.json' if a bare install of it should be read, else None
+    """
+    t = _strip_prefixes(seg)
+    if not t:
+        return None
+    f = _norm(t[0])
+
+    # python -m pip install …  (also `py -3 -m pip install`, python3.11, …)
+    if f == "py" or f == "python" or _PY_RE.match(f):
+        idx = 1
+        while idx < len(t) and t[idx].startswith("-") and t[idx] != "-m":
+            idx += 1
+        if idx + 2 < len(t) and t[idx] == "-m" and t[idx + 1] == "pip" and t[idx + 2] == "install":
+            return ("pypi", t[idx + 3:], "all", None)
+        return None
+
+    # pip / pip3 / pip3.12 / pipx
+    if f == "pipx":
+        if len(t) >= 2 and t[1] == "install":
+            return ("pypi", t[2:], "all", None)
+        if len(t) >= 2 and t[1] == "run":
+            return ("pypi", t[2:], "first", None)
+        return None
+    if f == "pip" or _PIP_RE.match(f):
+        if len(t) >= 2 and t[1] == "install":
+            return ("pypi", t[2:], "all", None)
+        return None
+
+    # uv / uvx
+    if f == "uv":
+        if len(t) >= 3 and t[1] == "pip" and t[2] == "install":
+            return ("pypi", t[3:], "all", None)
+        if len(t) >= 2 and t[1] == "add":
+            return ("pypi", t[2:], "all", None)
+        return None
+    if f == "uvx":
+        return ("pypi", t[1:], "first", None)
+
+    # poetry / pdm / pipenv
+    if f == "poetry" and len(t) >= 2 and t[1] == "add":
+        return ("pypi", t[2:], "all", None)
+    if f == "pdm" and len(t) >= 2 and t[1] == "add":
+        return ("pypi", t[2:], "all", None)
+    if f == "pipenv" and len(t) >= 2 and t[1] == "install":
+        return ("pypi", t[2:], "all", None)
+
+    # npm / yarn / pnpm / bun
+    if f == "npm" and len(t) >= 2 and t[1] in ("install", "i", "add"):
+        return ("npm", t[2:], "all", "package.json" if t[1] != "add" else None)
+    if f == "yarn":
+        if len(t) >= 2 and t[1] == "add":
+            return ("npm", t[2:], "all", None)
+        if len(t) >= 2 and t[1] == "dlx":
+            return ("npm", t[2:], "first", None)
+        return None
+    if f == "pnpm":
+        if len(t) >= 2 and t[1] in ("add", "install", "i"):
+            return ("npm", t[2:], "all", "package.json" if t[1] != "add" else None)
+        if len(t) >= 2 and t[1] == "dlx":
+            return ("npm", t[2:], "first", None)
+        return None
+    if f == "bun":
+        if len(t) >= 2 and t[1] == "add":
+            return ("npm", t[2:], "all", None)
+        if len(t) >= 2 and t[1] in ("install", "i"):
+            return ("npm", t[2:], "all", "package.json")
+        return None
+
+    # one-off executors: download-AND-run (strictly worse than install)
+    if f == "npx" or f == "bunx":
+        return ("npm", t[1:], "first", None)
+
     return None
 
 
@@ -171,8 +265,7 @@ def find_install_invocations(cmd: str, cwd: str = ""):
         c = _classify(seg)
         if not c:
             continue
-        eco, start = c
-        args = seg[start:]
+        eco, args, mode, manifest = c
         if any(a in _PRIVATE_INDEX for a in args):
             continue                                    # custom index: can't verify publicly, don't false-deny
         req_files, got_pkg, i = [], False, 0
@@ -189,11 +282,13 @@ def find_install_invocations(cmd: str, cwd: str = ""):
             name = _is_pkg(tok)
             if name:
                 found.append((eco, name)); got_pkg = True
+                if mode == "first":                     # executor: only the run target is a package
+                    break
             i += 1
         for rf in req_files:
             path = rf if os.path.isabs(rf) else os.path.join(base, rf)
             found.extend(("pypi", n) for n in _parse_requirements(path))
-        if eco == "npm" and not got_pkg and len(seg) >= 2 and seg[1] in ("install", "i"):
+        if manifest == "package.json" and not got_pkg:
             found.extend(("npm", n) for n in _parse_package_json(os.path.join(base, "package.json")))
     return found
 
@@ -229,7 +324,7 @@ def extract_identifiers(tool_name: str, tool_input: dict, cwd: str = ""):
     return work
 
 
-def run(verify_one, kind, ident, cwd):
+def run(kind, ident, cwd):
     if kind == "pypi":
         return verifier.verify_pypi(ident)
     if kind == "npm":
@@ -239,7 +334,26 @@ def run(verify_one, kind, ident, cwd):
     return None
 
 
-def main() -> int:
+def verify_all(work, cwd):
+    """Verify every (kind, ident) concurrently within one overall deadline.
+
+    Anything not resolved in time becomes cannot-verify -> the hook asks a human,
+    rather than letting the whole call slip past a hard timeout (fail-open)."""
+    verdicts = []
+    deadline = time.monotonic() + DEADLINE_S
+    with ThreadPoolExecutor(max_workers=min(8, len(work))) as ex:
+        futs = [(ex.submit(run, kind, ident, cwd), kind, ident) for kind, ident in work]
+        for fut, kind, ident in futs:
+            try:
+                v = fut.result(timeout=max(0.1, deadline - time.monotonic()))
+            except Exception:
+                v = verifier.Verdict(ident, kind, "cannot-verify", note="verification timed out")
+            if v:
+                verdicts.append(v)
+    return verdicts
+
+
+def _main() -> int:
     raw = sys.stdin.read()
     try:
         event = json.loads(raw)
@@ -253,7 +367,7 @@ def main() -> int:
     if not work:
         return 0  # nothing to verify -> allow normal flow
 
-    verdicts = [run(None, kind, ident, cwd) for (kind, ident) in work]
+    verdicts = verify_all(work, cwd)
     not_found = [v for v in verdicts if v and v.status == "not-found"]
     deprecated = [v for v in verdicts if v and v.status == "deprecated"]
     unverifiable = [v for v in verdicts if v and v.status == "cannot-verify"]
@@ -298,6 +412,26 @@ def main() -> int:
         return 0
 
     return 0  # all verified exists -> allow normal flow
+
+
+def main() -> int:
+    # Non-ASCII paths arrive mojibake'd if the pipe defaults to cp1252 (Windows);
+    # force UTF-8 so we don't false-deny a valid path we merely mis-decoded.
+    for stream in (sys.stdin, sys.stdout):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+    try:
+        return _main()
+    except Exception as e:
+        # A bug in the gate must never silently fail OPEN — surface to a human.
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "ask",
+            "permissionDecisionReason": f"vaporcheck internal error ({type(e).__name__}); verify manually.",
+        }}))
+        return 0
 
 
 if __name__ == "__main__":

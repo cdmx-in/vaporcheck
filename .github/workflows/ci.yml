@@ -20,6 +20,8 @@ jobs:
       # offline: pure parser / decision logic, no network
       - name: install-command parser
         run: python vaporcheck/test_parse.py
+      - name: command normalization + install verbs
+        run: python vaporcheck/test_verbs.py
       - name: manifest gate
         run: python vaporcheck/test_manifest.py
       - name: registry-response + decision logic

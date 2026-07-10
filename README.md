@@ -51,6 +51,8 @@ then add this to your tool's MCP config:
 
 Works on Windows, Mac, and Linux. No other dependencies.
 
+Not sure it's working? Run `python -m vaporcheck.doctor`.
+
 ## What it checks today
 
 - ✅ Python packages (PyPI) — including whole `requirements.txt` files

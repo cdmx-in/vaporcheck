@@ -73,6 +73,22 @@ def main():
           "permissionDecision" not in out, str(out))
     check("deprecated surfaces additionalContext warning", "additionalContext" in out, str(out))
 
+    # --- a crash inside the gate must fail to ASK, never silently allow ---
+    real_extract = hook.extract_identifiers
+    hook.extract_identifiers = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+    sys.stdin = io.StringIO(json.dumps({"tool_name": "Bash",
+                                        "tool_input": {"command": "pip install x"}, "cwd": "."}))
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            hook.main()
+        crash_out = json.loads(buf.getvalue() or "{}").get("hookSpecificOutput", {})
+    finally:
+        hook.extract_identifiers = real_extract
+        sys.stdin = real_stdin
+    check("internal crash -> ask (never silent allow)",
+          crash_out.get("permissionDecision") == "ask", str(crash_out))
+
     print(f"\n{sum(checks)}/{len(checks)} verdict cases passed")
     return 0 if all(checks) else 1
 
