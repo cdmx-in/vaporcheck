@@ -11,3 +11,6 @@ dist/
 
 # transient shim dir left over from the spike/ -> vaporcheck/ rename
 spike/
+
+# internal launch playbook — not for the public repo
+LAUNCH.md
