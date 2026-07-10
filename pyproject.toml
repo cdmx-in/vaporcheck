@@ -3,13 +3,13 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "verify-identifiers"
+name = "vaporcheck"
 version = "0.1.0"
-description = "Fail-closed existence verification for model-emitted identifiers (anti-slopsquatting)."
+description = "Fail-closed existence verification for model-emitted identifiers — catches hallucinated (vaporware) packages, paths, and symbols before an agent acts on them."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
-authors = [{ name = "cdmx.in", email = "licensing@cdmx.in" }]
+authors = [{ name = "Codemax IT Solutions Pvt. Ltd.", email = "licensing@cdmx.in" }]
 keywords = ["mcp", "llm", "agent", "hallucination", "slopsquatting", "supply-chain", "security"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -21,14 +21,16 @@ classifiers = [
 dependencies = []  # stdlib only — zero runtime dependencies by design
 
 [project.urls]
-Documentation = "https://github.com/cdmx-in/verify-identifiers/tree/main/docs"
+Homepage = "https://github.com/cdmx-in/vaporcheck"
+Repository = "https://github.com/cdmx-in/vaporcheck"
+Documentation = "https://github.com/cdmx-in/vaporcheck/tree/main/docs"
 
 [project.scripts]
-verify-mcp = "server:main"
+vaporcheck-mcp = "server:main"
 
 [tool.setuptools]
-package-dir = { "" = "spike" }
+package-dir = { "" = "vaporcheck" }
 py-modules = ["verifier", "cache", "server", "hook"]
 
 # Note: modules are currently flat (verifier/cache/server/hook). Namespacing them
-# under a `verify_identifiers` package is a roadmap item before PyPI publish.
+# under a `vaporcheck` package is a roadmap item before PyPI publish.

@@ -1,4 +1,4 @@
-"""Drive verify-mcp through a real MCP client handshake and assert responses.
+"""Drive the vaporcheck MCP server through a real client handshake and assert responses.
 
 Spawns server.py over stdio and speaks newline-delimited JSON-RPC 2.0:
 initialize -> initialized -> tools/list -> tools/call(...). No mocks; the
@@ -61,8 +61,8 @@ def main():
 
     init = c.request("initialize", {"protocolVersion": "2025-06-18",
                                     "capabilities": {}, "clientInfo": {"name": "spike-test", "version": "0"}})
-    check("initialize -> serverInfo.name == verify-mcp",
-          init.get("result", {}).get("serverInfo", {}).get("name") == "verify-mcp",
+    check("initialize -> serverInfo.name == vaporcheck",
+          init.get("result", {}).get("serverInfo", {}).get("name") == "vaporcheck",
           json.dumps(init.get("result", {}).get("serverInfo", {})))
 
     c.notify("notifications/initialized")

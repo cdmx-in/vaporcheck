@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "verify-mcp": {
+    "vaporcheck": {
       "command": "py",
-      "args": ["-3", "c:/Users/Roney/Documents/new-project/spike/server.py"]
+      "args": ["-3", "c:/Users/Roney/Documents/new-project/vaporcheck/server.py"]
     }
   }
 }

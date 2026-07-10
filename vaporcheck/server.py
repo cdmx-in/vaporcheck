@@ -1,4 +1,4 @@
-"""verify-mcp — a dependency-free MCP server for identifier existence verification.
+"""vaporcheck — a dependency-free MCP server for identifier existence verification.
 
 Transport: stdio, JSON-RPC 2.0, newline-delimited (one JSON object per line).
 Stdlib only — no SDK, no install. Reuses the resolvers in verifier.py.
@@ -16,7 +16,7 @@ import sys
 
 import verifier
 
-SERVER_NAME = "verify-mcp"
+SERVER_NAME = "vaporcheck"
 SERVER_VERSION = "0.1.0"
 DEFAULT_PROTOCOL = "2025-06-18"
 

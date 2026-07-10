@@ -19,7 +19,7 @@ from typing import Optional
 import cache
 
 TIMEOUT_S = 8
-_UA = {"User-Agent": "identifier-verifier-spike/0.1"}
+_UA = {"User-Agent": "vaporcheck/0.1"}
 
 
 @dataclass

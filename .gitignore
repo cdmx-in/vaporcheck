@@ -8,3 +8,6 @@ dist/
 
 # local agent config (the live dogfooding wiring — not part of the package)
 .claude/settings.local.json
+
+# transient shim dir left over from the spike/ -> vaporcheck/ rename
+spike/

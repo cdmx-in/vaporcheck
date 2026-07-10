@@ -19,15 +19,15 @@ jobs:
 
       # offline: pure parser logic, no network
       - name: install-command parser
-        run: python spike/test_parse.py
+        run: python vaporcheck/test_parse.py
 
       # online: these hit real PyPI / npm registries
       - name: hook behavior
-        run: python spike/run_spike.py
+        run: python vaporcheck/run_spike.py
       - name: MCP client handshake
-        run: python spike/test_mcp.py
+        run: python vaporcheck/test_mcp.py
       - name: cache latency / TTL
-        run: python spike/test_cache.py
+        run: python vaporcheck/test_cache.py
 
   build:
     runs-on: ubuntu-latest
