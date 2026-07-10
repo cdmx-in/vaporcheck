@@ -3,7 +3,6 @@
 **Stops AI coding assistants from using things that don't exist.**
 
 [![PyPI](https://img.shields.io/pypi/v/vaporcheck)](https://pypi.org/project/vaporcheck/)
-[![CI](https://github.com/cdmx-in/vaporcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/cdmx-in/vaporcheck/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 AI assistants sometimes invent package names, file paths, and function names that look real but aren't. Research found that almost **1 in 5 packages recommended by AI didn't exist** — and attackers register those fake names to spread malware (this is called *slopsquatting*).
@@ -66,9 +65,9 @@ Your assistant then gets a `verify_identifier` tool it can use to double-check a
 
 Coming next: more package ecosystems (Rust, Go, Ruby, Java), tool names, and code symbols.
 
-## Want the technical details?
+## More
 
-Architecture, research, benchmarks, and test suites are all in [docs/](docs/). The short version: zero dependencies, verdicts cached (~1 ms when warm), 38 tests against real registries, and it fails safe — a network hiccup never falsely blocks you.
+Developers and the curious can find everything else — how it works, the research behind it — in [docs/](docs/).
 
 ## License
 
