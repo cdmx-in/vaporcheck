@@ -1,0 +1,21 @@
+{
+  "name": "vaporcheck",
+  "displayName": "vaporcheck",
+  "version": "0.1.0",
+  "description": "Stops AI coding assistants from using things that don't exist — blocks hallucinated/slop-squatted package installs and dead file paths (fail-closed hook + verify_identifier MCP tool).",
+  "author": {
+    "name": "Codemax IT Solutions Pvt. Ltd.",
+    "email": "licensing@cdmx.in"
+  },
+  "homepage": "https://github.com/cdmx-in/vaporcheck",
+  "repository": "https://github.com/cdmx-in/vaporcheck",
+  "license": "Apache-2.0",
+  "keywords": ["security", "hallucination", "slopsquatting", "supply-chain", "mcp", "hooks"],
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": {
+    "vaporcheck": {
+      "command": "python",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/vaporcheck/server.py"]
+    }
+  }
+}

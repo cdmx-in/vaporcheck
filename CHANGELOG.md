@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Claude Code plugin + marketplace support**: `/plugin marketplace add cdmx-in/vaporcheck`
+  then `/plugin install vaporcheck@cdmx` installs the fail-closed hook (Bash + Edit)
+  and the MCP server in one step (`.claude-plugin/`, `hooks/hooks.json`).
+
 ## [0.1.0] — 2026-07-10
 
 First public release, on PyPI as [`vaporcheck`](https://pypi.org/project/vaporcheck/).

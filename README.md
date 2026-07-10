@@ -24,28 +24,22 @@ Real packages and real files pass through instantly. You'll never notice vaporch
 
 ## Install
 
+**If you use Claude Code** — two commands, done:
+
+```
+/plugin marketplace add cdmx-in/vaporcheck
+/plugin install vaporcheck@cdmx
+```
+
+That installs both the protection (the blocker) and the `verify_identifier` tool your assistant can use to double-check things itself.
+
+**If you use any other AI tool that supports MCP:**
+
 ```bash
 pip install vaporcheck
 ```
 
-That's it — no other dependencies, works on Windows, Mac, and Linux.
-
-## Set up
-
-**If you use Claude Code** — add this to `.claude/settings.json` in your project, then restart:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      { "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "python /path/to/vaporcheck/vaporcheck/hook.py", "timeout": 15 }] }
-    ]
-  }
-}
-```
-
-**If you use any other AI tool that supports MCP** — add this to your MCP config:
+then add this to your tool's MCP config:
 
 ```json
 {
@@ -55,7 +49,7 @@ That's it — no other dependencies, works on Windows, Mac, and Linux.
 }
 ```
 
-Your assistant then gets a `verify_identifier` tool it can use to double-check anything before acting on it.
+Works on Windows, Mac, and Linux. No other dependencies.
 
 ## What it checks today
 
