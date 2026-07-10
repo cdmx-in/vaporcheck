@@ -53,11 +53,11 @@ Works on Windows, Mac, and Linux. No other dependencies.
 
 ## What it checks today
 
-- ✅ Python packages (PyPI)
-- ✅ JavaScript packages (npm)
+- ✅ Python packages (PyPI) — including whole `requirements.txt` files
+- ✅ JavaScript packages (npm) — including `package.json`
 - ✅ File paths on your computer
 
-Coming next: more package ecosystems (Rust, Go, Ruby, Java), tool names, and code symbols.
+Coming next: more package ecosystems (Rust, Go, Ruby, Java) and code symbols.
 
 ## More
 

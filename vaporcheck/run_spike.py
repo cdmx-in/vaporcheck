@@ -4,6 +4,7 @@ Feeds the hook the exact JSON Claude Code pipes on stdin for real tool
 calls, captures its stdout, and checks the permission decision. No mocks:
 real registry lookups, real subprocess, real stdin/stdout contract.
 """
+import atexit
 import json
 import os
 import subprocess
@@ -13,6 +14,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "hook.py")
 EXISTING_FILE = HOOK                      # a path that really exists
 MISSING_FILE = os.path.join(HERE, "this_path_does_not_exist_zzz.py")
+
+# a temp requirements file containing a slopsquat, for the manifest-gate e2e case
+REQ_SLOP = os.path.join(HERE, "_tmp_req_slop.txt")
+with open(REQ_SLOP, "w", encoding="utf-8") as _f:
+    _f.write("requests\nreqeusts-slop-xyz-9931-zzz\n")
+atexit.register(lambda: os.path.exists(REQ_SLOP) and os.remove(REQ_SLOP))
 
 
 def call_hook(tool_name, tool_input):
@@ -31,9 +38,12 @@ def call_hook(tool_name, tool_input):
         return "allow(silent)", ""
     try:
         d = json.loads(out)["hookSpecificOutput"]
-        return d["permissionDecision"], d.get("permissionDecisionReason", "")
     except Exception:
         return f"?? raw={out!r}", ""
+    decision = d.get("permissionDecision")
+    if decision is None:                              # additionalContext-only (e.g. deprecated)
+        return "allow(context)", d.get("additionalContext", "")
+    return decision, d.get("permissionDecisionReason", "")
 
 
 CASES = [
@@ -44,6 +54,7 @@ CASES = [
     ("npm install FAKE pkg",        "Bash",  {"command": "npm install expresss-fake-zzz-0001"},           "deny"),
     ("pip w/ version pin + 2 pkgs", "Bash",  {"command": "pip install requests==2.31.0 flask"},           "allow(silent)"),
     ("pip one good one BOGUS",      "Bash",  {"command": "pip install requests boguspkg-zzz-77"},         "deny"),
+    ("pip install -r SLOP manifest", "Bash", {"command": f"pip install -r {REQ_SLOP.replace(os.sep, '/')}"}, "deny"),
     ("plain bash, no identifier",   "Bash",  {"command": "ls -la && echo hi"},                            "allow(silent)"),
     ("Edit existing file",          "Edit",  {"file_path": EXISTING_FILE, "old_string": "a", "new_string": "b"}, "allow(silent)"),
     ("Edit NONEXISTENT path",       "Edit",  {"file_path": MISSING_FILE, "old_string": "a", "new_string": "b"}, "deny"),

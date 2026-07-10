@@ -14,6 +14,7 @@ Output contract (current Claude Code standard):
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import sys
@@ -29,6 +30,17 @@ _VERSION_SPLIT = re.compile(r"[=<>!~\[]|@(?=[\d^~v])")
 _VALID_NAME = re.compile(r"^@?[A-Za-z0-9._/-]+$")
 # control operators that separate one command from the next
 _CONTROL = {";", "|", "||", "&&", "&", "(", ")", "|&", "\n"}
+# install options that consume the FOLLOWING token as a value (so it is not a package)
+_OPT_WITH_VALUE = {
+    "-r", "--requirement", "-i", "--index-url", "--extra-index-url", "-c",
+    "--constraint", "-f", "--find-links", "--proxy", "--python", "--prefix",
+    "--target", "-t", "--root", "--platform", "--abi", "--implementation",
+    "--registry", "--save-exact",
+}
+# a custom package index means we cannot verify names against the public registry
+_PRIVATE_INDEX = {"-i", "--index-url", "--extra-index-url", "--registry"}
+# manifest files whose contents route through the same resolvers
+_REQ_FLAGS = {"-r", "--requirement"}
 # legacy fallback patterns (used only if shell tokenization fails)
 _PY_INSTALL = re.compile(r"\b(?:pip3?|pipx|uv(?:\s+pip)?|python3?\s+-m\s+pip)\s+install\b", re.I)
 _NPM_INSTALL = re.compile(r"\b(?:npm\s+(?:i|install|add)|yarn\s+add|pnpm\s+add)\b", re.I)
@@ -82,13 +94,60 @@ def _classify(seg):
     return None
 
 
-def find_install_invocations(cmd: str):
+def _parse_requirements(path: str):
+    """Extract package names from a pip requirements file (best-effort)."""
+    names = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return names                                    # unreadable -> nothing to gate here
+    for raw in lines:
+        line = raw.split("#", 1)[0].strip()             # drop comments
+        if not line or line.startswith("-"):            # blank / -e / -r / --flag
+            continue
+        line = line.split(";", 1)[0].strip()            # drop env markers
+        parts = line.split()
+        if parts:
+            name = _is_pkg(parts[0])
+            if name:
+                names.append(name)
+    return names
+
+
+def _parse_package_json(path: str):
+    """Extract dependency names from a package.json (all dependency sections)."""
+    names = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return names
+    if not isinstance(data, dict):
+        return names
+    for field in ("dependencies", "devDependencies",
+                  "optionalDependencies", "peerDependencies"):
+        deps = data.get(field)
+        if isinstance(deps, dict):
+            for nm in deps:
+                name = _is_pkg(nm)
+                if name:
+                    names.append(name)
+    return names
+
+
+def find_install_invocations(cmd: str, cwd: str = ""):
     """Shell-aware: only genuine install COMMANDS yield packages.
 
     Install strings that appear as DATA (quoted args, heredoc bodies, grep
     patterns) are ignored, because the install verb is not at a command
     position. This is the fix for the live-dogfooding false-positive where a
     command that merely *contained* an install string got blocked.
+
+    Beyond explicit package args, this also expands manifest installs:
+    `pip install -r requirements.txt` reads the file, and a bare `npm install`
+    reads package.json — so the common "write a manifest, then install it" flow
+    is gated rather than bypassed.
     """
     cmd = _strip_heredocs(cmd)
     try:
@@ -106,18 +165,36 @@ def find_install_invocations(cmd: str):
             seg.append(tok)
     if seg:
         segs.append(seg)
+    base = cwd or os.getcwd()
     found = []
     for seg in segs:
         c = _classify(seg)
         if not c:
             continue
         eco, start = c
-        for tok in seg[start:]:
-            if "<" in tok or ">" in tok:               # redirect => end of args
+        args = seg[start:]
+        if any(a in _PRIVATE_INDEX for a in args):
+            continue                                    # custom index: can't verify publicly, don't false-deny
+        req_files, got_pkg, i = [], False, 0
+        while i < len(args):
+            tok = args[i]
+            if "<" in tok or ">" in tok:                # redirect => end of args
                 break
+            if eco == "pypi" and tok in _REQ_FLAGS and i + 1 < len(args):
+                req_files.append(args[i + 1]); i += 2; continue
+            if tok in _OPT_WITH_VALUE:                  # option + its value: skip both
+                i += 2; continue
+            if tok.startswith("-"):                     # boolean flag
+                i += 1; continue
             name = _is_pkg(tok)
             if name:
-                found.append((eco, name))
+                found.append((eco, name)); got_pkg = True
+            i += 1
+        for rf in req_files:
+            path = rf if os.path.isabs(rf) else os.path.join(base, rf)
+            found.extend(("pypi", n) for n in _parse_requirements(path))
+        if eco == "npm" and not got_pkg and len(seg) >= 2 and seg[1] in ("install", "i"):
+            found.extend(("npm", n) for n in _parse_package_json(os.path.join(base, "package.json")))
     return found
 
 
@@ -137,12 +214,12 @@ def _legacy_scan(cmd: str):
     return found
 
 
-def extract_identifiers(tool_name: str, tool_input: dict):
-    """Return list of (verify_fn, *args, label) for the actual tool call."""
+def extract_identifiers(tool_name: str, tool_input: dict, cwd: str = ""):
+    """Return list of (kind, identifier) for the actual tool call."""
     work = []
     if tool_name == "Bash":
         cmd = tool_input.get("command", "") or ""
-        work.extend(find_install_invocations(cmd))
+        work.extend(find_install_invocations(cmd, cwd))
     elif tool_name == "Edit":
         # Editing a file that does not exist is a hallucinated-path failure.
         fp = tool_input.get("file_path")
@@ -172,7 +249,7 @@ def main() -> int:
     tool_input = event.get("tool_input", {}) or {}
     cwd = event.get("cwd", "")
 
-    work = extract_identifiers(tool_name, tool_input)
+    work = extract_identifiers(tool_name, tool_input, cwd)
     if not work:
         return 0  # nothing to verify -> allow normal flow
 
@@ -209,12 +286,14 @@ def main() -> int:
         return 0
 
     if deprecated:
-        # allow but surface a warning the model can see (additionalContext)
+        # Surface a warning WITHOUT auto-approving: emit additionalContext only,
+        # no permissionDecision, so the user's normal permission prompt still
+        # applies. (Emitting "allow" here would give deprecated installs LESS
+        # friction than healthy ones — the opposite of the intent.)
         warn = "; ".join(f"{v.identifier} is DEPRECATED ({v.note})" for v in deprecated)
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "permissionDecision": "allow",
-            "permissionDecisionReason": f"Verified, with warning: {warn}",
+            "additionalContext": f"vaporcheck: {warn}. Prefer a maintained alternative.",
         }}))
         return 0
 

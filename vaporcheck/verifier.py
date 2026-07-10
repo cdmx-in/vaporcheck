@@ -111,8 +111,13 @@ def _live_npm(name: str) -> Verdict:
     if status == 404:
         return Verdict(name, "package:npm", "not-found")
     if status == 200 and data:
+        versions = data.get("versions") or {}
+        # npm returns 200 for UNPUBLISHED names too (body carries time.unpublished
+        # and no live versions). Treating that as "exists" would green-light the
+        # exact malware-shaped names this tool exists to catch — so it's not-found.
+        if not versions or data.get("time", {}).get("unpublished"):
+            return Verdict(name, "package:npm", "not-found", note="unpublished")
         latest = data.get("dist-tags", {}).get("latest")
-        versions = data.get("versions", {})
         if latest and versions.get(latest, {}).get("deprecated"):
             return Verdict(name, "package:npm", "deprecated", name,
                            str(versions[latest]["deprecated"])[:120])

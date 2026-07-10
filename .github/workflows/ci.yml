@@ -17,9 +17,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      # offline: pure parser logic, no network
+      # offline: pure parser / decision logic, no network
       - name: install-command parser
         run: python vaporcheck/test_parse.py
+      - name: manifest gate
+        run: python vaporcheck/test_manifest.py
+      - name: registry-response + decision logic
+        run: python vaporcheck/test_verdicts.py
 
       # online: these hit real PyPI / npm registries
       - name: hook behavior

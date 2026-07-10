@@ -9,6 +9,25 @@ All notable changes to this project are documented here. Format loosely follows
 - **Claude Code plugin + marketplace support**: `/plugin marketplace add cdmx-in/vaporcheck`
   then `/plugin install vaporcheck@cdmx` installs the fail-closed hook (Bash + Edit)
   and the MCP server in one step (`.claude-plugin/`, `hooks/hooks.json`).
+- **Manifest gate**: `pip install -r requirements.txt` now reads the file and a bare
+  `npm install` reads `package.json`, so the common "write a manifest, then install it"
+  flow is verified instead of bypassed.
+
+### Fixed
+- **npm false "exists"**: unpublished and security-holding packages (HTTP 200 with no
+  live versions / `time.unpublished`) were reported as `exists` and cached for 7 days —
+  exactly the malware-shaped names the tool targets. They are now `not-found`.
+- **Deprecated no longer auto-approves**: the hook emitted `permissionDecision: "allow"`
+  for deprecated packages, which *skipped* the user's normal permission prompt (less
+  friction than a healthy install). It now emits `additionalContext` only, leaving the
+  normal permission flow intact.
+- **Fewer false denies**: option values (`--target dir`, `-i url`, …) are no longer
+  mistaken for package names, and installs against a private index/registry are skipped
+  rather than denied against the public registry.
+
+### Tests
+- New suites `test_manifest.py` (7) and `test_verdicts.py` (7); `run_spike.py` gains a
+  manifest-deny end-to-end case. 53 checks across 6 suites.
 
 ## [0.1.0] — 2026-07-10
 
