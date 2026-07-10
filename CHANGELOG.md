@@ -3,17 +3,21 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.1.0] — 2026-07-10
 
-### Changed
+First public release, on PyPI as [`vaporcheck`](https://pypi.org/project/vaporcheck/).
+
+### Changed (since the internal 2026-06-14 MVP below)
 - **Renamed the project to `vaporcheck`** (was `verify-identifiers`; name availability
   verified across PyPI / npm / GitHub / trademarks). Code moved from `spike/` to
   `vaporcheck/`; MCP server name and console script renamed accordingly
   (`verify-mcp` → `vaporcheck` / `vaporcheck-mcp`).
 - Published under **Codemax IT Solutions Pvt. Ltd.** (LICENSE / NOTICE / pyproject).
-- README: added install instructions (clone or `pip install git+`).
+- Modules namespaced under the `vaporcheck` package (dual-mode imports keep the
+  files runnable as plain scripts for the hook / MCP config).
+- README: added install instructions (`pip install vaporcheck` or clone).
 
-## [0.1.0] — 2026-06-14
+## [0.1.0-mvp] — 2026-06-14
 
 First working MVP. Validated, dogfooded, and live-confirmed in Claude Code.
 

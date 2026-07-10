@@ -14,7 +14,10 @@ MCP client ask "does this referent actually exist?" before relying on it.
 import json
 import sys
 
-import verifier
+try:
+    from . import verifier  # installed package
+except ImportError:
+    import verifier  # run as a plain script from the source tree
 
 SERVER_NAME = "vaporcheck"
 SERVER_VERSION = "0.1.0"

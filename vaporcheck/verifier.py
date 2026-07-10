@@ -16,7 +16,10 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Optional
 
-import cache
+try:
+    from . import cache  # installed package
+except ImportError:
+    import cache  # run as a plain script from the source tree
 
 TIMEOUT_S = 8
 _UA = {"User-Agent": "vaporcheck/0.1"}

@@ -42,21 +42,19 @@ Tool-names and API-symbols buried in generated code are *verify-on-write / verif
 
 Requires **Python 3.10+**. **Zero runtime dependencies** (stdlib only — fitting for an anti-supply-chain-risk tool).
 
-### Option A — clone (recommended; the hook and MCP config point at files)
+### Option A — pip (adds the `vaporcheck-mcp` console command)
+
+```bash
+pip install vaporcheck
+```
+
+### Option B — clone (if you want the hook/MCP config to point at source files)
 
 ```bash
 git clone https://github.com/cdmx-in/vaporcheck.git
 cd vaporcheck
 python vaporcheck/test_parse.py   # offline smoke test — should print 10/10 PASS
 ```
-
-### Option B — pip install from GitHub (adds the `vaporcheck-mcp` console command)
-
-```bash
-pip install git+https://github.com/cdmx-in/vaporcheck.git
-```
-
-A PyPI release is on the roadmap (after the modules are namespaced under a package).
 
 ## Configure
 
@@ -106,7 +104,7 @@ Restart Claude Code to load the hook. Now `pip install <hallucinated-package>` i
 - [ ] **Tool-name** resolver (against the live tool registry) — greenfield, no incumbent
 - [ ] **API-symbol** resolver (via LSP / compiler) — greenfield
 - [ ] Citations resolver (last; the crowded class — breadth, not headline)
-- [ ] Namespace the modules under a package; publish to PyPI
+- [x] Namespace the modules under a package; publish to PyPI
 
 ## Tests
 

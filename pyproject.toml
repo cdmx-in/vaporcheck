@@ -26,11 +26,10 @@ Repository = "https://github.com/cdmx-in/vaporcheck"
 Documentation = "https://github.com/cdmx-in/vaporcheck/tree/main/docs"
 
 [project.scripts]
-vaporcheck-mcp = "server:main"
+vaporcheck-mcp = "vaporcheck.server:main"
 
 [tool.setuptools]
-package-dir = { "" = "vaporcheck" }
-py-modules = ["verifier", "cache", "server", "hook"]
+packages = ["vaporcheck"]
 
-# Note: modules are currently flat (verifier/cache/server/hook). Namespacing them
-# under a `vaporcheck` package is a roadmap item before PyPI publish.
+# ponytail: the test files ship inside the wheel (~20 KB, stdlib-only, harmless);
+# split them out to a tests/ dir if wheel hygiene ever matters.

@@ -18,7 +18,10 @@ import re
 import shlex
 import sys
 
-import verifier
+try:
+    from . import verifier  # installed package
+except ImportError:
+    import verifier  # run as a plain script from the source tree
 
 # strip version pins / extras: requests==2.0, requests>=2, pkg[extra], left@1.2.3
 _VERSION_SPLIT = re.compile(r"[=<>!~\[]|@(?=[\d^~v])")
